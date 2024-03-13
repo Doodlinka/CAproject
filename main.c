@@ -39,9 +39,10 @@ int main() {
         // printf("i: %d\n", i);
         printf("id: ");
         printstr(data[i].id);
-        printf(", sum: %d, count: %d\n", data[i].avg.fraction.sum, data[i].avg.fraction.count);
+        printf(", sum: %ld, count: %d", data[i].avg.fraction.sum, data[i].avg.fraction.count);
+        data[i].avg.value = (double)data[i].avg.fraction.sum / data[i].avg.fraction.count;
+        printf(", value: %.3f\n", data[i].avg.value);
     }
-    // TODO: convert average fractions to doubles
 }
 
 

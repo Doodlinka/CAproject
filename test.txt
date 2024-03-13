@@ -1,8 +1,11 @@
 ac -5
 aa 1
 aa 2
+0123456789abcdef 7
 ad 10000
 aa 3
 ab 0
 ab 10
 ac 5
+0123456789abcdef -10000
+
