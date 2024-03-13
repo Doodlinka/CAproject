@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 
 #define MAX_ID_LEN 16
 #define MAX_INPUT_AMOUNT 10000
@@ -27,22 +28,29 @@ int readDataFromSTDIN(struct DataPoint data[]);
 int findRecordWithID(struct DataPoint data[], int data_index, char current_id[]);
 void movstr(char dst[], char src[]);
 void fillWithNewlines(char str[]);
-// struct DataPoint[] mergeSort();
+struct DataPoint* mergeSort(struct DataPoint* arr, struct DataPoint* aux, int length);
 void printstr(char str[]);
 
 
 int main() {   
     struct DataPoint data[MAX_INPUT_AMOUNT];
     int data_length = readDataFromSTDIN(data);
-    printf("data length: %d\n", data_length);
+    // printf("data length: %d\n", data_length);
     for (int i = 0; i < data_length; i++) {
         // printf("i: %d\n", i);
-        printf("id: ");
-        printstr(data[i].id);
-        printf(", sum: %ld, count: %d", data[i].avg.fraction.sum, data[i].avg.fraction.count);
+        // printf("id: ");
+        // printstr(data[i].id);
+        // printf(", sum: %ld, count: %d", data[i].avg.fraction.sum, data[i].avg.fraction.count);
         data[i].avg.value = (double)data[i].avg.fraction.sum / data[i].avg.fraction.count;
-        printf(", value: %.3f\n", data[i].avg.value);
+        // printf(", value: %.3f\n", data[i].avg.value);
     }
+    struct DataPoint* aux = malloc(sizeof(char) * data_length);
+    struct DataPoint* sorted_data_ptr = mergeSort(data, aux, data_length);
+    for (int i = 0; i < data_length; i++) {
+        printstr(sorted_data_ptr[i].id);
+        printf("\n");
+    }
+    free(aux);
 }
 
 
@@ -132,9 +140,36 @@ void fillWithNewlines(char str[]) {
 
 
 // returns the array that ends up containing the sorted data
-// struct DataPoint[] mergeSort() {
-
-// }
+struct DataPoint* mergeSort(struct DataPoint* arr, struct DataPoint* aux, int length) {
+    for (int width = 1; width < length; width *= 2) {
+        int mid = width, right = 2*width;
+        if (right >= length) right = length;
+        int i = 0, j = width, k = 0;
+        for (k = 0; k < length;) {
+            if (i < mid && (j >= right || arr[i].avg.value <= arr[j].avg.value)) {
+                aux[k] = arr[i];
+                i++;
+                k++;
+            } else {
+                aux[k] = arr[j];
+                j++;  
+                k++;  
+            }
+            if (k >= right) {
+                i = right;
+                mid += 2*width;
+                if (mid >= length) mid = length;
+                right += 2*width;
+                if (right >= length) right = length;
+                j = mid;
+            }
+        }
+        struct DataPoint* temp = aux;
+        aux = arr;
+        arr = temp;
+    }
+    return arr;
+}
 
 void printstr(char str[]) {
     for (int i = 0; i < MAX_ID_LEN; i++) {
