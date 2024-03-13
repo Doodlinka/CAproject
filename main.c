@@ -146,7 +146,7 @@ struct DataPoint* mergeSort(struct DataPoint* arr, struct DataPoint* aux, int le
         if (right >= length) right = length;
         int i = 0, j = width, k = 0;
         for (k = 0; k < length;) {
-            if (i < mid && (j >= right || arr[i].avg.value <= arr[j].avg.value)) {
+            if (i < mid && (j >= right || arr[i].avg.value >= arr[j].avg.value)) {
                 aux[k] = arr[i];
                 i++;
                 k++;
