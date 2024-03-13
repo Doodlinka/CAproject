@@ -1,0 +1,8 @@
+ac -5
+aa 1
+aa 2
+ad 10000
+aa 3
+ab 0
+ab 10
+ac 5
