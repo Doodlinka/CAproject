@@ -5,6 +5,7 @@
 ## BUGS
 
 - [x] there need to be EXACTLY TWO newlines at the end of the file
+- [ ] when redirecting stdout to file on laptop, the file is created but empty
 
 ## Possible optimisations
 
