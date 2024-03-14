@@ -35,14 +35,12 @@ void printstr(char str[]);
 int main() {   
     struct DataPoint data[MAX_INPUT_AMOUNT];
     int data_length = readDataFromSTDIN(data);
-    // printf("data length: %d\n", data_length);
     for (int i = 0; i < data_length; i++) {
-        // printf("i: %d\n", i);
-        // printf("id: ");
-        // printstr(data[i].id);
-        // printf(", sum: %ld, count: %d", data[i].avg.fraction.sum, data[i].avg.fraction.count);
+        printf("id: ");
+        printstr(data[i].id);
+        printf(", sum: %ld, count: %d", data[i].avg.fraction.sum, data[i].avg.fraction.count);
         data[i].avg.value = (double)data[i].avg.fraction.sum / data[i].avg.fraction.count;
-        // printf(", value: %.3f\n", data[i].avg.value);
+        printf(", value: %.3f\n", data[i].avg.value);
     }
     struct DataPoint* aux = malloc(sizeof(char) * data_length);
     struct DataPoint* sorted_data_ptr = mergeSort(data, aux, data_length);

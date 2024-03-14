@@ -4,7 +4,7 @@
 
 ## BUGS
 
-- [ ] there need to be EXACTLY TWO newlines at the end of the file
+- [x] there need to be EXACTLY TWO newlines at the end of the file
 
 ## Possible optimisations
 
