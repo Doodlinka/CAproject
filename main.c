@@ -63,7 +63,7 @@ int readDataFromSTDIN(struct DataPoint data[]) {
     bool negative = false;
     enum ReadState state = READ_ID;
 
-    while ((ch = getchar()) != EOF) {
+    while ((ch = getchar()) != EOF || state != READ_ID) {
         switch (state) {
 
             case SAVE_VALUES: ;
@@ -85,7 +85,7 @@ int readDataFromSTDIN(struct DataPoint data[]) {
                 negative = false;
                 state = READ_ID;
                 // consume the second newline characher if it's there
-                if (ch == '\r' || ch == '\n') break;
+                if (ch == '\r' || ch == '\n' || ch == EOF) break;
 
             case READ_ID:
                 if (ch == ' ') state = READ_VAL;
@@ -96,7 +96,7 @@ int readDataFromSTDIN(struct DataPoint data[]) {
                 break;
 
             case READ_VAL:
-                if (ch == '\r' || ch == '\n') state = SAVE_VALUES;
+                if (ch == '\r' || ch == '\n' || ch == EOF) state = SAVE_VALUES;
                 else if (ch == '-') negative = true;
                 else {
                     current_val *= 10;
@@ -104,6 +104,7 @@ int readDataFromSTDIN(struct DataPoint data[]) {
                 }
         }
     }
+
     return data_index;
 }
 
