@@ -29,6 +29,8 @@ main proc
 		int 21h
 		inc bx
 	loop writeLoop
+	mov dl, 0Dh
+	int 21h
 
 	mov ax, 4c00h
     int 21h
