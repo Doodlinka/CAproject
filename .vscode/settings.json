@@ -4,7 +4,8 @@
         "TASM": {
             "baseBundle": "<built-in>/TASM.jsdos",
             "before": [
-                "set PATH=C:\\TASM"
+                "set PATH=C:\\TASM",
+                "cd asmimpl"
             ],
             "run": [
                 "TASM ${file}",
