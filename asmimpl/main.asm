@@ -1,28 +1,32 @@
-; this is documented in *the book* (switches syntax from MASM to TASM), but doesn't actually work??
-; ideal
-.model compact
+ideal
+p286
+p287
+model compact
 
 MAX_DATA_AMOUNT equ 10000
 MAX_ID_LEN equ 16
+LF equ 13
 
-DataPoint struc
+struc DataPoint
 	sumOrAverage dd ?
 	count dw ?
 	id_addr dw ?
-DataPoint ends
+ends DataPoint
 
 ; TODO: I'll have to define two or three extra segments to store the worst-case memory requirement
 ; model compact may be crucial because it allows several data segments, but apparently it's possible to not go by a model entirely?
 ; each segment can fit 4096 IDs, 8192 values, or 2978 full structs
 ; refer to pages 21-22 and 447-461 of *the book* for details 
 ; https://archive.org/details/bitsavers_borlandtureringTurboAssembler2ed1995_80572557/page/446/mode/2up?view=theater
-.data
+dataseg
 	bxFor3F dw 0
 	cxFor3F dw 1
+
+udataseg
 	current_id db MAX_ID_LEN dup(?)
 	input_buffer db ?
 
-.stack 256
+stack 256
 
 ; it says "location counter overlow", but this is exactly 64KB, and it looks fine on the map
 segment valueSegment
@@ -33,7 +37,7 @@ segment valueSegment2
 	values2 DataPoint MAX_DATA_AMOUNT - 8192 dup(<>)
 ends valueSegment2
 
-; I can't say the number 65536, I have to define separate names or use a bigger type instead
+; I can't use the number 65536, I have to define separate names or use a bigger type instead
 segment idSegment
 	ids db 65535 dup(?)
 	last_id_byte db ?
@@ -49,8 +53,8 @@ segment idSegment3
 ends idSegment3
 
 
-.code
-main proc
+codeseg
+proc main
 	mov ax, @data
 	mov ds, ax
 
@@ -69,9 +73,9 @@ main proc
 
 	mov ax, 4c00h
     int 21h
-main endp
+endp main
 
-getChar proc
+proc getChar
 	; https://www.stanislavs.org/helppc/int_21-3f.html
 	mov ah, 3Fh
 	xchg bx, [bxFor3F]
@@ -85,14 +89,26 @@ getChar proc
 	xchg bx, [bxFor3F]
 	xchg cx, [cxFor3F]
 	endGetChar: ret
-getChar endp
+endp getChar
 
-readValue proc
+proc readValue
 
-readValue endp
+endp readValue
 
-cmpCurrent proc
-
-cmpCurrent endp
+; address of the string in es:di, uses cx, returns the zero flag
+proc cmpCurrentID
+	cld
+	mov cx, MAX_ID_LEN
+	mov si, offset current_id
+	; I don't want to use repE because I need to terminate on \n (there may be unequal garbage beyond it)
+	myRepE:
+		; apparently it's possible to use cmps [byte ptr ds:si], [byte ptr es:di], in case I need customization
+		cmpsb
+		jne endCmpCurrentID
+		cmp [byte ptr ds:si - 1], LF
+		je endCmpCurrentID
+	loop myRepE
+	endCmpCurrentID: ret
+endp cmpCurrentID
 
 end main
