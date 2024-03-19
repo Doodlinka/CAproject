@@ -67,7 +67,6 @@ proc main
 		call getChar
 		jz doneReading
 		; put the char into the buffer
-		mov al, [input_char]
 		mov [current_id + bx], al
 		; move on to the next iteration
 		inc bx
@@ -90,51 +89,50 @@ proc getChar
 	; restore our values
 	xchg bx, [bxFor3F]
 	xchg cx, [cxFor3F]
+	mov al, [input_char]
 	; check for EOF
 	test ax, ax
 	ret
 endp getChar
 
-; uses all general regs, returns ax, assumes the file pointer is at the value stage
+; uses all general regs, returns bx, assumes the stdin pointer is at the value stage
+; TODO: consider using pushf and popf instead of cl (and make getChar not save cx by default?)
 proc readValue
-	xor ax, ax
+	xor bx, bx
 	mov dx, offset input_char
-	; cx will be 0 if we read a '-'
+	; cl will be 0 if a '-' is read
 	call getChar
-	mov cx, [input_char]
-	sub cx, '-'
+	mov cl, al
+	sub cl, '-'
 	jnz dontConsumeValueChar
 	readValueLoop:
-		; get a char, return if EOF
-		push ax
+		; get a char, stop reading if EOF
 		call getChar
-		pop ax
-		jz endGetValue
+		jz stopReadingValue
 		dontConsumeValueChar:
-		; return if EOL
-		mov bx, [input_char]
-		cmp bx, CR
-		je endGetValue
-		cmp bx, LF
-		je endGetValue
-		; append digit to the result (would lea be better?)
-		mul 10
-		add ax, bx
-		sub ax, ASCII_ZERO
-	jne readValueLoop
+		; stop reading if EOL
+		cmp al, CR
+		je stopReadingValue
+		cmp al, LF
+		je stopReadingValue
+		; append digit to the result (I'd use lea into ax if it didn't suck pre-386)
+		imul bx, 10
+		add bx, ax ; ah gotta be zero after a 3FH call
+		sub bx, ASCII_ZERO
+	jmp readValueLoop
 	; account for the '-'
-	test cx, cx
+	stopReadingValue:
+	test cl, cl
 	jnz endGetValue
-	neg ax
+	neg bx
 	endGetValue: ret
 endp readValue
 
-; address of the string in es:di, uses cx and si, returns the zero flag
+; address of the string in es:di, uses cx and si, returns the zero flag, assumes ds = @data
 proc cmpCurrentIDToEsDi
 	cld
 	mov cx, MAX_ID_LEN
 	mov si, offset current_id
-	assume ds:@data
 	; I don't want to use repE because I need to terminate on \n (there may be unequal garbage beyond it)
 	myRepE:
 		; it's possible to use cmps [byte ptr ds:si], [byte ptr es:di], in case I need customization
