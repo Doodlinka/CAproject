@@ -5,6 +5,7 @@ model compact
 
 MAX_DATA_AMOUNT equ 10000
 MAX_ID_LEN equ 16
+CR equ 10
 LF equ 13
 
 struc DataPoint
@@ -18,42 +19,42 @@ ends DataPoint
 ; each segment can fit 4096 IDs, 8192 values, or 2978 full structs
 ; refer to pages 21-22 and 447-461 of *the book* for details 
 ; https://archive.org/details/bitsavers_borlandtureringTurboAssembler2ed1995_80572557/page/446/mode/2up?view=theater
-dataseg
+DataSeg
 	bxFor3F dw 0
 	cxFor3F dw 1
 
-udataseg
+UDataSeg
 	current_id db MAX_ID_LEN dup(?)
 	input_buffer db ?
 
-stack 256
+Stack 256
 
 ; it says "location counter overlow", but this is exactly 64KB, and it looks fine on the map
-segment valueSegment
+segment ValueSegment
 	values DataPoint 8192 dup(<>)
-ends valueSegment
+ends ValueSegment
 
-segment valueSegment2
+segment ValueSegment2
 	values2 DataPoint MAX_DATA_AMOUNT - 8192 dup(<>)
-ends valueSegment2
+ends ValueSegment2
 
 ; I can't use the number 65536, I have to define separate names or use a bigger type instead
-segment idSegment
+segment IDSegment
 	ids db 65535 dup(?)
 	last_id_byte db ?
-ends idSegment
+ends IDSegment
 
-segment idSegment2
+segment IDSegment2
 	ids2 db 65535 dup(?)
 	last_id_byte2 db ?
-ends idSegment2
+ends IDSegment2
 
-segment idSegment3
+segment IDSegment3
 	ids3 db (MAX_DATA_AMOUNT - 8192) * 16 dup(?)
-ends idSegment3
+ends IDSegment3
 
 
-codeseg
+CodeSeg
 proc main
 	mov ax, @data
 	mov ds, ax
@@ -65,6 +66,7 @@ proc main
 		call getChar
 		jz doneReading
 		; put the char into the buffer
+		mov al, [input_buffer]
 		mov [current_id + bx], al
 		; move on to the next iteration
 		inc bx
@@ -75,40 +77,65 @@ proc main
     int 21h
 endp main
 
+; may not flexible enough with the register use
+; takes the buffer in dx
+; TODO: consider pushing/popping bx and cx instead
 proc getChar
 	; https://www.stanislavs.org/helppc/int_21-3f.html
 	mov ah, 3Fh
 	xchg bx, [bxFor3F]
 	xchg cx, [cxFor3F]
 	int 21h
-	; check for EOF
-	test ax, ax
-	jz endGetChar
 	; restore our values
-	mov al, [input_buffer]
 	xchg bx, [bxFor3F]
 	xchg cx, [cxFor3F]
-	endGetChar: ret
+	; check for EOF
+	test ax, ax
+	ret
 endp getChar
 
 proc readValue
-
+	mov dx, offset input_buffer
+	readValueLoop:
+		push ax
+		mov ah, 3Fh
+		xchg bx, [bxFor3F]
+		xchg cx, [cxFor3F]
+		int 21h
+		; check for EOF
+		test ax, ax
+		jz endGetValue
+		; the next newline isn't consumed yet
+		; TODO: pop input buffer into bx or cx
+		cmp [input_buffer], CR
+		je endGetValue
+		cmp [input_buffer], LF
+		je endGetValue
+		; TODO: check for minus and store it in cx/bx
+		pop ax
+		mul 10
+		add ax, [input_buffer]
+		; TODO: make a const for it
+		sub ax, 48
+	jne readValueLoop
+	; TODO: apply minus
+	endGetValue: ret
 endp readValue
 
-; address of the string in es:di, uses cx, returns the zero flag
-proc cmpCurrentID
+; address of the string in es:di, uses cx and si, returns the zero flag
+proc cmpCurrentIDToEsDi
 	cld
 	mov cx, MAX_ID_LEN
 	mov si, offset current_id
+	assume ds:@data
 	; I don't want to use repE because I need to terminate on \n (there may be unequal garbage beyond it)
 	myRepE:
-		; apparently it's possible to use cmps [byte ptr ds:si], [byte ptr es:di], in case I need customization
+		; it's possible to use cmps [byte ptr ds:si], [byte ptr es:di], in case I need customization
 		cmpsb
 		jne endCmpCurrentID
 		cmp [byte ptr ds:si - 1], LF
-		je endCmpCurrentID
-	loop myRepE
+	loopne myRepE
 	endCmpCurrentID: ret
-endp cmpCurrentID
+endp cmpCurrentIDToEsDi
 
 end main
