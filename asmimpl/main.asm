@@ -7,6 +7,7 @@ MAX_DATA_AMOUNT equ 10000
 MAX_ID_LEN equ 16
 CR equ 10
 LF equ 13
+ASCII_ZERO equ 48
 
 struc DataPoint
 	sumOrAverage dd ?
@@ -25,7 +26,7 @@ DataSeg
 
 UDataSeg
 	current_id db MAX_ID_LEN dup(?)
-	input_buffer db ?
+	input_char db ?
 
 Stack 256
 
@@ -59,14 +60,14 @@ proc main
 	mov ax, @data
 	mov ds, ax
 
-	mov dx, offset input_buffer
+	mov dx, offset input_char
 	mov bx, 0
 	mov cx, MAX_ID_LEN
 	readLoop:
 		call getChar
 		jz doneReading
 		; put the char into the buffer
-		mov al, [input_buffer]
+		mov al, [input_char]
 		mov [current_id + bx], al
 		; move on to the next iteration
 		inc bx
@@ -94,31 +95,37 @@ proc getChar
 	ret
 endp getChar
 
+; uses all general regs, returns ax, assumes the file pointer is at the value stage
 proc readValue
-	mov dx, offset input_buffer
+	xor ax, ax
+	mov dx, offset input_char
+	; cx will be 0 if we read a '-'
+	call getChar
+	mov cx, [input_char]
+	sub cx, '-'
+	jnz dontConsumeValueChar
 	readValueLoop:
+		; get a char, return if EOF
 		push ax
-		mov ah, 3Fh
-		xchg bx, [bxFor3F]
-		xchg cx, [cxFor3F]
-		int 21h
-		; check for EOF
-		test ax, ax
-		jz endGetValue
-		; the next newline isn't consumed yet
-		; TODO: pop input buffer into bx or cx
-		cmp [input_buffer], CR
-		je endGetValue
-		cmp [input_buffer], LF
-		je endGetValue
-		; TODO: check for minus and store it in cx/bx
+		call getChar
 		pop ax
+		jz endGetValue
+		dontConsumeValueChar:
+		; return if EOL
+		mov bx, [input_char]
+		cmp bx, CR
+		je endGetValue
+		cmp bx, LF
+		je endGetValue
+		; append digit to the result (would lea be better?)
 		mul 10
-		add ax, [input_buffer]
-		; TODO: make a const for it
-		sub ax, 48
+		add ax, bx
+		sub ax, ASCII_ZERO
 	jne readValueLoop
-	; TODO: apply minus
+	; account for the '-'
+	test cx, cx
+	jnz endGetValue
+	neg ax
 	endGetValue: ret
 endp readValue
 
