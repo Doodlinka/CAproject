@@ -123,9 +123,9 @@ proc readValue
 	; account for the '-'
 	stopReadingValue:
 	test cl, cl
-	jnz endGetValue
+	jnz retGetValue
 	neg bx
-	endGetValue: ret
+	retGetValue: ret
 endp readValue
 
 ; address of the string in es:di, uses cx and si, returns the zero flag, assumes ds = @data
@@ -137,10 +137,10 @@ proc cmpCurrentIDToEsDi
 	myRepE:
 		; it's possible to use cmps [byte ptr ds:si], [byte ptr es:di], in case I need customization
 		cmpsb
-		jne endCmpCurrentID
+		jne retCmpCurrentID
 		cmp [byte ptr ds:si - 1], LF
 	loopne myRepE
-	endCmpCurrentID: ret
+	retCmpCurrentID: ret
 endp cmpCurrentIDToEsDi
 
 end main
