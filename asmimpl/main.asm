@@ -21,8 +21,9 @@ ends DataPoint
 ; refer to pages 21-22 and 447-461 of *the book* for details 
 ; https://archive.org/details/bitsavers_borlandtureringTurboAssembler2ed1995_80572557/page/446/mode/2up?view=theater
 DataSeg
-	bxFor3F dw 0
-	cxFor3F dw 1
+	bx_for_3F dw 0
+	cx_for_3F dw 1
+	data_length dw 0
 
 UDataSeg
 	current_id db MAX_ID_LEN dup(?)
@@ -36,22 +37,20 @@ segment ValueSegment
 ends ValueSegment
 
 segment ValueSegment2
-	values2 DataPoint MAX_DATA_AMOUNT - 8192 dup(<>)
+	values_2 DataPoint MAX_DATA_AMOUNT - 8192 dup(<>)
 ends ValueSegment2
 
 ; I can't use the number 65536, I have to define separate names or use a bigger type instead
 segment IDSegment
-	ids db 65535 dup(?)
-	last_id_byte db ?
+	ids dw 32768 dup(?)
 ends IDSegment
 
 segment IDSegment2
-	ids2 db 65535 dup(?)
-	last_id_byte2 db ?
+	ids_2 dw 32768 dup(?)
 ends IDSegment2
 
 segment IDSegment3
-	ids3 db (MAX_DATA_AMOUNT - 8192) * 16 dup(?)
+	ids_3 db (MAX_DATA_AMOUNT - 8192) * 16 dup(?)
 ends IDSegment3
 
 
@@ -80,7 +79,28 @@ proc main
 		call getChar ; if the loop exited normally, we read 16 chars and need to consume the ' '
 		readValueStage:
 		call readValue
-		; TODO: save values here
+		
+		mov ax, @IDSegment
+		mov es, ax
+		xor di, di
+		mov ax, [data_length]
+		test ax, ax
+		jz haveFoundID
+		findIDLoop:
+			call cmpCurrentIDToEsDi
+			jz haveFoundID
+			add di, cx
+			jno noIDSegmentOverflow
+			add es, 4096
+			noIDSegmentOverflow:
+			dec ax
+		jnz findIDLoop
+		; if the ID wasn't found,
+		; TODO:
+		haveFoundID:
+		neg ax
+		add ax, [data_length]
+		test ah, 0E0h ; 11100000
 	loop readLoop
 	doneReading:
 
@@ -94,12 +114,12 @@ endp main
 proc getChar
 	; https://www.stanislavs.org/helppc/int_21-3f.html
 	mov ah, 3Fh
-	xchg bx, [bxFor3F]
-	xchg cx, [cxFor3F]
+	xchg bx, [bx_for_3F]
+	xchg cx, [cx_for_3F]
 	int 21h
 	; restore our values
-	xchg bx, [bxFor3F]
-	xchg cx, [cxFor3F]
+	xchg bx, [bx_for_3F]
+	xchg cx, [cx_for_3F]
 	; check for EOF
 	test ax, ax
 	mov al, [input_char]
