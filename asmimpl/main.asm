@@ -61,15 +61,26 @@ proc main
 	mov ds, ax
 
 	mov dx, offset input_char
-	mov bx, 0
-	mov cx, MAX_ID_LEN
 	readLoop:
-		call getChar
-		jz doneReading
-		; put the char into the buffer
-		mov [current_id + bx], al
-		; move on to the next iteration
-		inc bx
+		mov cx, MAX_ID_LEN
+		xor bx, bx
+		readIDLoop:
+			call getChar
+			jz doneReading
+			; consume second newline if present
+			cmp al, CR
+			je readLoop
+			cmp al, LF
+			je readLoop
+			mov [current_id + bx], al
+			inc bx
+			cmp al, ' '
+			je readValueStage
+		loop readIDLoop
+		call getChar ; if the loop exited normally, we read 16 chars and need to consume the ' '
+		readValueStage:
+		call readValue
+		; TODO: save values here
 	loop readLoop
 	doneReading:
 
@@ -78,7 +89,7 @@ proc main
 endp main
 
 ; may not flexible enough with the register use
-; takes the buffer in dx
+; takes the buffer in dx, returns al
 ; TODO: consider pushing/popping bx and cx instead
 proc getChar
 	; https://www.stanislavs.org/helppc/int_21-3f.html
@@ -89,9 +100,9 @@ proc getChar
 	; restore our values
 	xchg bx, [bxFor3F]
 	xchg cx, [cxFor3F]
-	mov al, [input_char]
 	; check for EOF
 	test ax, ax
+	mov al, [input_char]
 	ret
 endp getChar
 
@@ -138,7 +149,7 @@ proc cmpCurrentIDToEsDi
 		; it's possible to use cmps [byte ptr ds:si], [byte ptr es:di], in case I need customization
 		cmpsb
 		jne retCmpCurrentID
-		cmp [byte ptr ds:si - 1], LF
+		cmp [byte ptr ds:si - 1], ' '
 	loopne myRepE
 	retCmpCurrentID: ret
 endp cmpCurrentIDToEsDi
