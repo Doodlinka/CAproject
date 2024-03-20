@@ -10,9 +10,9 @@ LF equ 13
 ASCII_ZERO equ 48
 
 struc DataPoint
-	sumOrAverage dd ?
+	sum_or_average dd ?
 	count dw ?
-	id_addr dw ?
+	id_index dw ?
 ends DataPoint
 
 ; TODO: I'll have to define two or three extra segments to store the worst-case memory requirement
@@ -90,17 +90,35 @@ proc main
 			call cmpCurrentIDToEsDi
 			jz haveFoundID
 			add di, cx
-			jno noIDSegmentOverflow
+			jno noIDSegOverflow
 			add es, 4096
-			noIDSegmentOverflow:
+			noIDSegOverflow:
 			dec ax
 		jnz findIDLoop
-		; if the ID wasn't found,
-		; TODO:
+		; if the ID wasn't found, save it and zero its values
+		mov si, offset current_id
+		saveCurrentIDLoop:
+			movsb
+			cmp [byte ptr ds:si - 1], ' '
+		loopne saveCurrentIDLoop
+		; TODO: have to calculate the value address here to zero it,
+		; but without duplicating the following code
+		inc [data_length]	
 		haveFoundID:
-		neg ax
-		add ax, [data_length]
-		test ah, 0E0h ; 11100000
+		; figure out the address of the value and save it
+		mov di, ax
+		neg di
+		add di, [data_length]
+		cmp di, 8192
+		mov cx, @ValueSegment
+		jl noValueSegOverlow
+		mov cx, @ValueSegment2
+		noValueSegOverlow:
+		mov es, cx
+		shl di, 3
+		add [es:di].sum_or_average, bx
+		inc [es:di].count
+		mov [es:di].id_index, ax
 	loop readLoop
 	doneReading:
 
@@ -164,10 +182,8 @@ proc cmpCurrentIDToEsDi
 	cld
 	mov cx, MAX_ID_LEN
 	mov si, offset current_id
-	; I don't want to use repE because I need to terminate on \n (there may be unequal garbage beyond it)
-	myRepE:
-		; it's possible to use cmps [byte ptr ds:si], [byte ptr es:di], in case I need customization
-		cmpsb
+	myRepE: ; I can't use actual repE because I need to terminate on ' ' (there will be unequal garbage beyond)
+		cmpsb ; it's possible to use cmps [byte ptr ds:si], [byte ptr es:di], in case I need customization
 		jne retCmpCurrentID
 		cmp [byte ptr ds:si - 1], ' '
 	loopne myRepE
