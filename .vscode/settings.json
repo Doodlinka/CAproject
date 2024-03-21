@@ -10,13 +10,13 @@
             "run": [
                 "TASM ${file}",
                 "TLINK ${filename}",
-                ">${filename} < test.txt"
+                ">..\\v3test\\testasm.bat"
             ],
             "debug": [
                 "TASM /zi ${file}",
                 "TLINK /v/3 ${filename}.obj",
                 "copy C:\\TASM\\TDC2.TD TDCONFIG.TD",
-                "TD -cTDCONFIG.TD ${filename}.exe < test.txt"
+                "TD -cTDCONFIG.TD ..\\v3test\\testasm.bat"
             ]
         },
         "MASM-v6.11": {

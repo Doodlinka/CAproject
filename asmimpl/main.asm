@@ -10,7 +10,7 @@ LF equ 13
 ASCII_ZERO equ 48
 
 struc DataPoint
-	sum_or_average dd ?
+	sum_or_average dd ? ; low word, high word
 	count dw ?
 	id_index dw ?
 ends DataPoint
@@ -80,7 +80,7 @@ proc main
 		readValueStage:
 		call readValue
 		
-		mov ax, @IDSegment
+		mov ax, IDSegment
 		mov es, ax
 		xor di, di
 		mov ax, [data_length]
@@ -91,7 +91,11 @@ proc main
 			jz haveFoundID
 			add di, cx
 			jno noIDSegOverflow
-			add es, 4096
+			push ax
+			mov ax, es
+			add ax, 4096
+			mov es, ax
+			pop ax
 			noIDSegOverflow:
 			dec ax
 		jnz findIDLoop
@@ -110,15 +114,16 @@ proc main
 		neg di
 		add di, [data_length]
 		cmp di, 8192
-		mov cx, @ValueSegment
+		mov cx, ValueSegment
 		jl noValueSegOverlow
-		mov cx, @ValueSegment2
+		mov cx, ValueSegment2
 		noValueSegOverlow:
 		mov es, cx
 		shl di, 3
-		add [es:di].sum_or_average, bx
-		inc [es:di].count
-		mov [es:di].id_index, ax
+		add [word ptr es:di], bx ; low sum
+		adc [word ptr es:di + 2], 0 ; high sum
+		inc [word ptr es:di + 4] ; count
+		mov [word ptr es:di + 6], ax ; string index
 	loop readLoop
 	doneReading:
 
