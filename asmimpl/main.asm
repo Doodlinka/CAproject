@@ -9,9 +9,9 @@ LF equ 13
 ASCII_ZERO equ 48
 
 struc DataPoint
-	sum_or_average dd 0 ; low word, high word
-	count dw 0
-	id_index dw 0
+	sum_or_average dd ? ; low word, high word
+	count dw ?
+	id_index dw ?
 ends DataPoint
 
 ; TODO: I'll have to define two or three extra segments to store the worst-case memory requirement
@@ -60,16 +60,14 @@ proc main
 	mov ax, @data
 	mov ds, ax
 
-	mov dx, offset input_char
 	readLoop:
+		mov dx, offset input_char
 		mov cx, MAX_ID_LEN
 		xor bx, bx
 		readIDLoop:
 			call getChar
 			jz doneReading
 			; consume second newline if present
-			cmp al, CR
-			je readLoop
 			cmp al, LF
 			je readLoop
 			mov [current_id + bx], al
@@ -84,52 +82,43 @@ proc main
 		mov ax, IDSegment
 		mov es, ax
 		xor di, di
-		mov ax, [data_length]
-		test ax, ax
+		mov cx, [data_length]
+		test cx, cx
 		jz saveNewID
-		findIDLoop:
-			call cmpCurrentIDToEsDi
-			je haveFoundID
-			dec cx ; if they weren't equal, cx didn't get decreased one last time
-			add di, cx
-			jno noIDSegOverflow
-			push ax
-			mov ax, es
-			add ax, 4096
-			mov es, ax
-			pop ax
-			noIDSegOverflow:
-			dec ax
-		jnz findIDLoop
+		call findCurrentID
+		je haveFoundID
 
 		saveNewID:
 		; if the ID wasn't found, save it and zero its values
-		mov si, offset current_id
-		mov cx, MAX_ID_LEN
-		saveCurrentIDLoop:
-			movsb
-			cmp [byte ptr ds:si - 1], ' '
-		loopne saveCurrentIDLoop
-		; TODO: have to calculate the value address here to zero it,
-		; but without duplicating the following code
-		inc [data_length] ; TODO: this needs to happen AFTER di is calculated
+		call saveCurrentIDToEsDi
+		xor dl, dl ; remember that ID wasn't found, works as long as offset input_char's low byte isn't naturally zero
 
 		haveFoundID:
-		; figure out the address of the value and save it
-		neg ax
-		add ax, [data_length]
-		mov di, ax
+		; figure out the address of the value
+		neg cx
+		add cx, [data_length]
+		mov di, cx
 		cmp di, 8192
-		mov cx, ValueSegment
+		mov ax, ValueSegment
 		jb noValueSegOverlow
-		mov cx, ValueSegment2
+		mov ax, ValueSegment2
 		noValueSegOverlow:
-		mov es, cx
+		mov es, ax
 		shl di, 3
+		; this mube done if the ID hasn't been found, but only after di is calculated
+		test dl, dl
+		jnz skipZeroingValues
+		mov [word ptr es:di], 0 ; low sum
+		mov [word ptr es:di + 2], 0 ; high sum
+		mov [word ptr es:di + 4], 0 ; count
+		mov [word ptr es:di + 6], 0 ; string index
+		inc [data_length]
+
+		skipZeroingValues:
 		add [word ptr es:di], bx ; low sum
 		adc [word ptr es:di + 2], 0 ; high sum
 		inc [word ptr es:di + 4] ; count
-		mov [word ptr es:di + 6], ax ; string index
+		mov [word ptr es:di + 6], cx ; string index
 	jmp readLoop
 	doneReading:
 
@@ -159,7 +148,6 @@ endp getChar
 ; TODO: consider using pushf and popf instead of cl (and make getChar not save cx by default?)
 proc readValue
 	xor bx, bx
-	mov dx, offset input_char
 	; cl will be 0 if a '-' is read
 	call getChar
 	mov cl, al
@@ -188,18 +176,45 @@ proc readValue
 	retGetValue: ret
 endp readValue
 
+; sets zf if it has been found, returns the reverse index in cx
+proc findCurrentID
+	findIDLoop:
+		call cmpCurrentIDToEsDi
+		je retFindCurrentID
+		dec ax ; if they weren't equal, ax didn't get decreased one last time
+		add di, ax
+		jno noIDSegOverflow
+		mov dx, es
+		add dx, 4096
+		mov es, dx
+		noIDSegOverflow:
+	loop findIDLoop
+	retFindCurrentID: ret
+endp findCurrentID
+
 ; address of the string in es:di, uses si, returns the zero flag (and cx if zf=0), assumes ds = @data
 proc cmpCurrentIDToEsDi
 	cld
-	mov cx, MAX_ID_LEN
+	mov ax, MAX_ID_LEN
 	mov si, offset current_id
 	myRepE: ; I can't use actual repE because I need to terminate on ' ' (there will be unequal garbage beyond)
 		cmpsb ; it's possible to use cmps [byte ptr ds:si], [byte ptr es:di], in case I need customization
-		jne retCmpCurrentID ; if this jump happens, cx won't get decreased one last time, will have to adjust outside to not mess the flags up
+		jne retCmpCurrentID ; if this jump happens, ax won't get decreased one last time, will have to adjust outside to not mess the flags up
 		cmp [byte ptr ds:si - 1], ' '
-	loopne myRepE
-	xor cl, cl ; if the loop terminates by cx, the zf won't get set, so set it (cx is destroyed but I don't need it when a match is found)
+		je retCmpCurrentID ; this avois decrementing ax too, but I don't need it when a match is found
+		dec ax
+	jnz myRepE
 	retCmpCurrentID: ret
 endp cmpCurrentIDToEsDi
+
+proc saveCurrentIDToEsDi
+	mov si, offset current_id
+	mov cx, MAX_ID_LEN
+	saveCurrentIDLoop:
+		movsb
+		cmp [byte ptr ds:si - 1], ' '
+	loopne saveCurrentIDLoop
+	ret
+endp saveCurrentIDToEsDi
 
 end main
