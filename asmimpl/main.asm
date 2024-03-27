@@ -77,7 +77,7 @@ proc main
 		loop readIDLoop
 		call getChar ; if the loop exited normally, we read 16 chars and need to consume the ' '
 		readValueStage:
-		call readValue
+		call readValue ; TODO: move this past the id search, maybe? cuz I have to keep bx the entire time
 		
 		mov ax, IDSegment
 		mov es, ax
@@ -115,8 +115,10 @@ proc main
 		inc [data_length]
 
 		skipZeroingValues:
-		add [word ptr es:di], bx ; low sum
-		adc [word ptr es:di + 2], 0 ; high sum
+		mov ax, bx ; guess I should've read it into ax, but don't care
+		cwd ; gotta make sure that negatives ahve infinite -1s to the left or shit won't be subtracting
+		add [word ptr es:di], ax ; low sum
+		adc [word ptr es:di + 2], dx ; high sum
 		inc [word ptr es:di + 4] ; count
 		mov [word ptr es:di + 6], cx ; string index
 	jmp readLoop
@@ -208,12 +210,14 @@ proc cmpCurrentIDToEsDi
 endp cmpCurrentIDToEsDi
 
 proc saveCurrentIDToEsDi
+	push cx
 	mov si, offset current_id
 	mov cx, MAX_ID_LEN
 	saveCurrentIDLoop:
 		movsb
 		cmp [byte ptr ds:si - 1], ' '
 	loopne saveCurrentIDLoop
+	pop cx
 	ret
 endp saveCurrentIDToEsDi
 
