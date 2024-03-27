@@ -1,6 +1,5 @@
 ideal
 p286
-p287
 model compact
 
 MAX_DATA_AMOUNT equ 10000
@@ -10,9 +9,9 @@ LF equ 13
 ASCII_ZERO equ 48
 
 struc DataPoint
-	sum_or_average dd ? ; low word, high word
-	count dw ?
-	id_index dw ?
+	sum_or_average dd 0 ; low word, high word
+	count dw 0
+	id_index dw 0
 ends DataPoint
 
 ; TODO: I'll have to define two or three extra segments to store the worst-case memory requirement
@@ -42,11 +41,13 @@ ends ValueSegment2
 
 ; I can't use the number 65536, I have to define separate names or use a bigger type instead
 segment IDSegment
-	ids dw 32768 dup(?)
+	ids db 65535 dup(?)
+	db ?
 ends IDSegment
 
 segment IDSegment2
-	ids_2 dw 32768 dup(?)
+	ids_2 db 65535 dup(?)
+	db ?
 ends IDSegment2
 
 segment IDSegment3
@@ -85,10 +86,11 @@ proc main
 		xor di, di
 		mov ax, [data_length]
 		test ax, ax
-		jz haveFoundID
+		jz saveNewID
 		findIDLoop:
 			call cmpCurrentIDToEsDi
-			jz haveFoundID
+			je haveFoundID
+			dec cx ; if they weren't equal, cx didn't get decreased one last time
 			add di, cx
 			jno noIDSegOverflow
 			push ax
@@ -99,23 +101,27 @@ proc main
 			noIDSegOverflow:
 			dec ax
 		jnz findIDLoop
+
+		saveNewID:
 		; if the ID wasn't found, save it and zero its values
 		mov si, offset current_id
+		mov cx, MAX_ID_LEN
 		saveCurrentIDLoop:
 			movsb
 			cmp [byte ptr ds:si - 1], ' '
 		loopne saveCurrentIDLoop
 		; TODO: have to calculate the value address here to zero it,
 		; but without duplicating the following code
-		inc [data_length]	
+		inc [data_length] ; TODO: this needs to happen AFTER di is calculated
+
 		haveFoundID:
 		; figure out the address of the value and save it
+		neg ax
+		add ax, [data_length]
 		mov di, ax
-		neg di
-		add di, [data_length]
 		cmp di, 8192
 		mov cx, ValueSegment
-		jl noValueSegOverlow
+		jb noValueSegOverlow
 		mov cx, ValueSegment2
 		noValueSegOverlow:
 		mov es, cx
@@ -124,7 +130,7 @@ proc main
 		adc [word ptr es:di + 2], 0 ; high sum
 		inc [word ptr es:di + 4] ; count
 		mov [word ptr es:di + 6], ax ; string index
-	loop readLoop
+	jmp readLoop
 	doneReading:
 
 	mov ax, 4c00h
@@ -182,16 +188,17 @@ proc readValue
 	retGetValue: ret
 endp readValue
 
-; address of the string in es:di, uses cx and si, returns the zero flag, assumes ds = @data
+; address of the string in es:di, uses si, returns the zero flag (and cx if zf=0), assumes ds = @data
 proc cmpCurrentIDToEsDi
 	cld
 	mov cx, MAX_ID_LEN
 	mov si, offset current_id
 	myRepE: ; I can't use actual repE because I need to terminate on ' ' (there will be unequal garbage beyond)
 		cmpsb ; it's possible to use cmps [byte ptr ds:si], [byte ptr es:di], in case I need customization
-		jne retCmpCurrentID
+		jne retCmpCurrentID ; if this jump happens, cx won't get decreased one last time, will have to adjust outside to not mess the flags up
 		cmp [byte ptr ds:si - 1], ' '
 	loopne myRepE
+	xor cl, cl ; if the loop terminates by cx, the zf won't get set, so set it (cx is destroyed but I don't need it when a match is found)
 	retCmpCurrentID: ret
 endp cmpCurrentIDToEsDi
 
