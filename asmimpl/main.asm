@@ -56,30 +56,14 @@ proc main
 
 	call readValues
 	call computeAverages
-	
-	; TODO: put in procedure, check if no swaps happened
-	mov cx, [data_length]
-	dec cx
-	mov ax, ValueSegment
-	mov es, ax
-	outerSortLoop:
-		push cx
-		xor bx, bx
-		innerSortLoop:
-			mov ax, [es:bx]
-			cmp ax, [es:bx + DATA_WIDTH] ; averages
-			jge dontSwap ; descending (swap if left < right)
-			xchg [es:bx + DATA_WIDTH], ax ; swap average
-			mov [es:bx], ax
-			mov ax, [es:bx + ID_INDEX_OFFSET] ; swap string index
-			xchg [es:bx + DATA_WIDTH + ID_INDEX_OFFSET], ax
-			mov [es:bx + ID_INDEX_OFFSET], ax
-			dontSwap:
-			add bx, DATA_WIDTH
-		loop innerSortLoop
-		pop cx
-	loop outerSortLoop
+	call bubbleSort
+	call printResults
 
+	mov ax, 4c00h
+    int 21h
+endp main
+
+proc printResults
 	mov cx, [data_length]
 	mov ax, ValueSegment
 	mov es, ax
@@ -107,11 +91,34 @@ proc main
 		int 21h
 		add bx, DATA_WIDTH
 	loop outerPrintLoop
+	ret
+endp printResults
 
-	mov ax, 4c00h
-    int 21h
-endp main
-
+; TODO: check if no swaps happened
+proc bubbleSort
+	mov cx, [data_length]
+	dec cx
+	mov ax, ValueSegment
+	mov es, ax
+	outerSortLoop:
+		push cx
+		xor bx, bx
+		innerSortLoop:
+			mov ax, [es:bx]
+			cmp ax, [es:bx + DATA_WIDTH] ; averages
+			jge dontSwap ; descending (swap if left < right)
+			xchg [es:bx + DATA_WIDTH], ax ; swap average
+			mov [es:bx], ax
+			mov ax, [es:bx + ID_INDEX_OFFSET] ; swap string index
+			xchg [es:bx + DATA_WIDTH + ID_INDEX_OFFSET], ax
+			mov [es:bx + ID_INDEX_OFFSET], ax
+			dontSwap:
+			add bx, DATA_WIDTH
+		loop innerSortLoop
+		pop cx
+	loop outerSortLoop
+	ret
+endp bubbleSort
 
 proc computeAverages
 	mov cx, [data_length]
