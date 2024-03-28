@@ -8,17 +8,14 @@ CR equ 10
 LF equ 13
 ASCII_ZERO equ 48
 
+; didn't figure out how to index by name, so this is just documentation
 struc DataPoint
-	sum_or_average dd ? ; low word, high word
+	low_sum_or_average dw ?
+	high_sum dw ?
 	count dw ?
 	id_index dw ?
 ends DataPoint
 
-; TODO: I'll have to define two or three extra segments to store the worst-case memory requirement
-; model compact may be crucial because it allows several data segments, but apparently it's possible to not go by a model entirely?
-; each segment can fit 4096 IDs, 8192 values, or 2978 full structs
-; refer to pages 21-22 and 447-461 of *the book* for details 
-; https://archive.org/details/bitsavers_borlandtureringTurboAssembler2ed1995_80572557/page/446/mode/2up?view=theater
 DataSeg
 	bx_for_3F dw 0
 	cx_for_3F dw 1
@@ -39,7 +36,7 @@ segment ValueSegment2
 	values_2 DataPoint MAX_DATA_AMOUNT - 8192 dup(<>)
 ends ValueSegment2
 
-; I can't use the number 65536, I have to define separate names or use a bigger type instead
+; I can't use the number 65536
 segment IDSegment
 	ids db 65535 dup(?)
 	db ?
@@ -60,13 +57,38 @@ proc main
 	mov ax, @data
 	mov ds, ax
 
+	call readValues
+
+	mov cx, [data_length]
+	xor bx, bx
+	mov ax, ValueSegment
+	mov es, ax
+	divLoop:
+		mov ax, [es:bx] ; low sum
+		mov dx, [es:bx + 2] ; high sum
+		idiv [word ptr es:bx + 4] ; count
+		mov [es:bx], ax
+		add bx, 8
+		jnc noValueSegOverflowWhenDividing
+		mov ax, es
+		add ax, 4096
+		mov es, ax
+		noValueSegOverflowWhenDividing:
+	loop divLoop
+
+	mov ax, 4c00h
+    int 21h
+endp main
+
+
+proc readValues
 	readLoop:
 		mov dx, offset input_char
 		mov cx, MAX_ID_LEN
 		xor bx, bx
 		readIDLoop:
 			call getChar
-			jz doneReading
+			jz retReadValues
 			; consume second newline if present
 			cmp al, LF
 			je readLoop
@@ -96,13 +118,13 @@ proc main
 		haveFoundID:
 		; figure out the address of the value
 		neg cx
-		add cx, [data_length]
+		add cx, [data_length] ; now it contains the index
 		mov di, cx
 		cmp di, 8192
 		mov ax, ValueSegment
-		jb noValueSegOverlow
+		jb noValueSegOverflowWhenSaving
 		mov ax, ValueSegment2
-		noValueSegOverlow:
+		noValueSegOverflowWhenSaving:
 		mov es, ax
 		shl di, 3
 		; this mube done if the ID hasn't been found, but only after di is calculated
@@ -122,11 +144,9 @@ proc main
 		inc [word ptr es:di + 4] ; count
 		mov [word ptr es:di + 6], cx ; string index
 	jmp readLoop
-	doneReading:
 
-	mov ax, 4c00h
-    int 21h
-endp main
+	retReadValues: ret
+endp readValues
 
 ; may not flexible enough with the register use
 ; takes the buffer in dx, returns al
@@ -185,11 +205,11 @@ proc findCurrentID
 		je retFindCurrentID
 		dec ax ; if they weren't equal, ax didn't get decreased one last time
 		add di, ax
-		jno noIDSegOverflow
+		jnc noIDSegOverflowWhenSearching
 		mov dx, es
 		add dx, 4096
 		mov es, dx
-		noIDSegOverflow:
+		noIDSegOverflowWhenSearching:
 	loop findIDLoop
 	retFindCurrentID: ret
 endp findCurrentID
