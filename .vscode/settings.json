@@ -16,7 +16,7 @@
                 "TASM /zi ${file}",
                 "TLINK /v/3 ${filename}.obj",
                 "copy C:\\TASM\\TDC2.TD TDCONFIG.TD",
-                "TD -cTDCONFIG.TD ${filename}.exe < test.txt"
+                "TD -cTDCONFIG.TD ${filename}.exe < test.txt > out.txt"
             ]
         },
         "MASM-v6.11": {

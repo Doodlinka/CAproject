@@ -62,6 +62,7 @@ proc main
 	call readValues
 	call computeAverages
 	
+	; TODO: put in procedure, check if no swaps happened
 	mov cx, [data_length]
 	dec cx
 	mov ax, ValueSegment
@@ -83,6 +84,32 @@ proc main
 		loop innerSortLoop
 		pop cx
 	loop outerSortLoop
+
+	mov cx, [data_length]
+	mov ax, ValueSegment
+	mov es, ax
+	mov bx, 6
+	outerPrintLoop:
+		mov ax, IDSegment
+		add ax, [es:bx] ; this only works because IDs are 16 wide, beginning can be addressed with just the segment
+		mov ds, ax
+		xor si, si
+		push cx
+		mov cx, MAX_ID_LEN
+		innerPrintLoop:
+			lodsb
+			cmp al, ' '
+			je breakInnerPrintLoop
+			mov dl, al
+			mov ah, 02h
+			int 21h
+		loop innerPrintLoop
+		breakInnerPrintLoop:
+		pop cx
+		mov dl, LF
+		int 21h
+		add bx, 8
+	loop outerPrintLoop
 
 	mov ax, 4c00h
     int 21h
