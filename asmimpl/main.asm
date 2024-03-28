@@ -9,7 +9,9 @@ LF equ 13
 ASCII_ZERO equ 48
 
 ; didn't figure out how to index by name, so this is just documentation
-struc DataPoint
+; TODO: string indexes are known before sorting, so only store sum and count at the start
+; then, save the string indexes when dividing
+struc DataPoint 
 	low_sum_or_average dw ?
 	high_sum dw ?
 	count dw ?
@@ -58,7 +60,36 @@ proc main
 	mov ds, ax
 
 	call readValues
+	call computeAverages
+	
+	mov cx, [data_length]
+	dec cx
+	mov ax, ValueSegment
+	mov es, ax
+	outerSortLoop:
+		push cx
+		xor bx, bx
+		innerSortLoop:
+			mov ax, [es:bx]
+			cmp ax, [es:bx + 8] ; averages
+			jge dontSwap ; descending (swap if left < right)
+			xchg [es:bx + 8], ax ; swap average
+			mov [es:bx], ax
+			mov ax, [es:bx + 6] ; swap string index
+			xchg [es:bx + 8 + 6], ax
+			mov [es:bx + 6], ax
+			dontSwap:
+			add bx, 8 ; TODO: overflow check or decrease structure size to 6 bytes
+		loop innerSortLoop
+		pop cx
+	loop outerSortLoop
 
+	mov ax, 4c00h
+    int 21h
+endp main
+
+
+proc computeAverages ; TODO: do the 8192 check only once at beginning, then repeat if necessary
 	mov cx, [data_length]
 	xor bx, bx
 	mov ax, ValueSegment
@@ -75,10 +106,8 @@ proc main
 		mov es, ax
 		noValueSegOverflowWhenDividing:
 	loop divLoop
-
-	mov ax, 4c00h
-    int 21h
-endp main
+	ret
+endp computeAverages
 
 
 proc readValues
