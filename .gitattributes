@@ -1,2 +1,3 @@
 * text eol=lf
 *.exe -text
+.txt -text # the tests need to keep their eols

@@ -4,8 +4,8 @@ model compact
 
 MAX_DATA_AMOUNT equ 10000
 MAX_ID_LEN equ 16
-CR equ 10
-LF equ 13
+CR equ 13
+LF equ 10
 ASCII_ZERO equ 48
 
 ; didn't figure out how to index by name, so this is just documentation
@@ -106,6 +106,8 @@ proc main
 		loop innerPrintLoop
 		breakInnerPrintLoop:
 		pop cx
+		mov dl, CR
+		int 21h
 		mov dl, LF
 		int 21h
 		add bx, 8
