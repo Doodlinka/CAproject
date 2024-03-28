@@ -7,15 +7,16 @@ MAX_ID_LEN equ 16
 CR equ 13
 LF equ 10
 ASCII_ZERO equ 48
+DATA_WIDTH equ 6
+ID_INDEX_OFFSET equ 2
 
 ; didn't figure out how to index by name, so this is just documentation
 ; TODO: string indexes are known before sorting, so only store sum and count at the start
 ; then, save the string indexes when dividing
 struc DataPoint 
-	low_sum_or_average dw ?
-	high_sum dw ?
-	count dw ?
-	id_index dw ?
+	low_sum_OR_average dw ?
+	high_sum_OR_id_index dw ?
+	count_OR_obsolete dw ?
 ends DataPoint
 
 DataSeg
@@ -31,12 +32,8 @@ Stack 256
 
 ; it says "location counter overlow", but this is exactly 64KB, and it looks fine on the map
 segment ValueSegment
-	values DataPoint 8192 dup(<>)
+	values DataPoint MAX_DATA_AMOUNT dup(<>)
 ends ValueSegment
-
-segment ValueSegment2
-	values_2 DataPoint MAX_DATA_AMOUNT - 8192 dup(<>)
-ends ValueSegment2
 
 ; I can't use the number 65536
 segment IDSegment
@@ -72,15 +69,15 @@ proc main
 		xor bx, bx
 		innerSortLoop:
 			mov ax, [es:bx]
-			cmp ax, [es:bx + 8] ; averages
+			cmp ax, [es:bx + DATA_WIDTH] ; averages
 			jge dontSwap ; descending (swap if left < right)
-			xchg [es:bx + 8], ax ; swap average
+			xchg [es:bx + DATA_WIDTH], ax ; swap average
 			mov [es:bx], ax
-			mov ax, [es:bx + 6] ; swap string index
-			xchg [es:bx + 8 + 6], ax
-			mov [es:bx + 6], ax
+			mov ax, [es:bx + ID_INDEX_OFFSET] ; swap string index
+			xchg [es:bx + DATA_WIDTH + ID_INDEX_OFFSET], ax
+			mov [es:bx + ID_INDEX_OFFSET], ax
 			dontSwap:
-			add bx, 8 ; TODO: overflow check or decrease structure size to 6 bytes
+			add bx, DATA_WIDTH ; TODO: overflow check or decrease structure size to 6 bytes
 		loop innerSortLoop
 		pop cx
 	loop outerSortLoop
@@ -88,7 +85,7 @@ proc main
 	mov cx, [data_length]
 	mov ax, ValueSegment
 	mov es, ax
-	mov bx, 6
+	mov bx, ID_INDEX_OFFSET
 	outerPrintLoop:
 		mov ax, IDSegment
 		add ax, [es:bx] ; this only works because IDs are 16 wide, beginning can be addressed with just the segment
@@ -110,7 +107,7 @@ proc main
 		int 21h
 		mov dl, LF
 		int 21h
-		add bx, 8
+		add bx, DATA_WIDTH
 	loop outerPrintLoop
 
 	mov ax, 4c00h
@@ -123,17 +120,17 @@ proc computeAverages ; TODO: do the 8192 check only once at beginning, then repe
 	xor bx, bx
 	mov ax, ValueSegment
 	mov es, ax
+	xor ax, ax
 	divLoop:
+		push ax
 		mov ax, [es:bx] ; low sum
 		mov dx, [es:bx + 2] ; high sum
 		idiv [word ptr es:bx + 4] ; count
 		mov [es:bx], ax
-		add bx, 8
-		jnc noValueSegOverflowWhenDividing
-		mov ax, es
-		add ax, 4096
-		mov es, ax
-		noValueSegOverflowWhenDividing:
+		pop ax
+		mov [es:bx + ID_INDEX_OFFSET], ax
+		inc ax
+		add bx, DATA_WIDTH
 	loop divLoop
 	ret
 endp computeAverages
@@ -175,23 +172,19 @@ proc readValues
 
 		haveFoundID:
 		; figure out the address of the value
-		neg cx
-		add cx, [data_length] ; now it contains the index
-		mov di, cx
-		cmp di, 8192
 		mov ax, ValueSegment
-		jb noValueSegOverflowWhenSaving
-		mov ax, ValueSegment2
-		noValueSegOverflowWhenSaving:
 		mov es, ax
-		shl di, 3
+		mov ax, [data_length]
+		sub ax, cx
+		mov cx, DATA_WIDTH	
+		mul cl
+		mov di, ax
 		; this mube done if the ID hasn't been found, but only after di is calculated
 		test dl, dl
 		jnz skipZeroingValues
-		mov [word ptr es:di], 0 ; low sum
+		mov [word ptr es:di], 0 ; low sum ; TODO: don't zero, it's zeroed
 		mov [word ptr es:di + 2], 0 ; high sum
 		mov [word ptr es:di + 4], 0 ; count
-		mov [word ptr es:di + 6], 0 ; string index
 		inc [data_length]
 
 		skipZeroingValues:
@@ -200,7 +193,6 @@ proc readValues
 		add [word ptr es:di], ax ; low sum
 		adc [word ptr es:di + 2], dx ; high sum
 		inc [word ptr es:di + 4] ; count
-		mov [word ptr es:di + 6], cx ; string index
 	jmp readLoop
 
 	retReadValues: ret
