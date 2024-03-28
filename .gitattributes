@@ -1,3 +1,4 @@
 * text eol=lf
 *.exe -text
-.txt -text # the tests need to keep their eols
+*.txt -text # the tests need to keep their eols
+SAMPLE_OUT* -text

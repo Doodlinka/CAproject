@@ -1,0 +1,10 @@
+0123456789abcdef 7
+0123456789abcdef -10000
+ac -5
+ac 5
+aa 1
+aa 2
+aa 3
+ab 0
+ab 10
+ad 10000
