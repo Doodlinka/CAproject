@@ -100,9 +100,11 @@ proc bubbleSort
 	dec cx
 	mov ax, ValueSegment
 	mov es, ax
+	xor dl, dl ; set to 1 if no swaps happened
 	outerSortLoop:
 		push cx
 		xor bx, bx
+		inc dl
 		innerSortLoop:
 			mov ax, [es:bx]
 			cmp ax, [es:bx + DATA_WIDTH] ; averages
@@ -112,12 +114,15 @@ proc bubbleSort
 			mov ax, [es:bx + ID_INDEX_OFFSET] ; swap string index
 			xchg [es:bx + DATA_WIDTH + ID_INDEX_OFFSET], ax
 			mov [es:bx + ID_INDEX_OFFSET], ax
+			xor dl, dl
 			dontSwap:
 			add bx, DATA_WIDTH
 		loop innerSortLoop
 		pop cx
+		test dl, dl
+		jnz retBubbleSort
 	loop outerSortLoop
-	ret
+	retBubbleSort: ret
 endp bubbleSort
 
 proc computeAverages
@@ -159,7 +164,7 @@ proc readValues
 		loop readIDLoop
 		call getChar ; if the loop exited normally, we read 16 chars and need to consume the ' '
 		readValueStage:
-		call readValue ; TODO: move this past the id search, maybe? cuz I have to keep bx the entire time
+		call readValue
 		
 		mov ax, IDSegment
 		mov es, ax
