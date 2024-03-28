@@ -32,6 +32,10 @@ segment ValueSegment
 	values DataPoint MAX_DATA_AMOUNT dup(<>)
 ends ValueSegment
 
+segment AuxValueSegment
+	values DataPoint MAX_DATA_AMOUNT dup(<>)
+ends AuxValueSegment
+
 ; it says "location counter overlow", but this is exactly 64KB, and it looks fine on the map
 ; I can't use the number 65536
 segment IDSegment
@@ -94,18 +98,83 @@ proc printResults
 	ret
 endp printResults
 
-; TODO: check if no swaps happened
+
+proc mergeSort
+	mov ax, ValueSegment
+	mov ds, ax
+	mov ax, AuxValueSegment
+	mov es, ax
+	mov bx, DATA_WIDTH ; merge width
+
+	mergeSortLoop:
+		xor si, si
+		xor di, di
+		mov cx, [data_length]
+		cld
+		copyToAuxLoop: ; assumes DATA_WIDTH == 6
+			lodsw
+			stosw
+			lodsw
+			stosw
+			lodsw
+			stosw
+		loop copyToAuxLoop
+
+		mov cx, [data_length]
+		xor si, si ; area 1 index
+		mov di, bx ; area 2 index
+		push bx
+		xor bx, bx ; result index
+		mov ax, DATA_WIDTH
+		mergeBackLoop:
+			; if one of the indices is at the end of its range, use the other
+			cmp si, ax
+			ja takeSecond
+			add ax, DATA_WIDTH
+			cmp di, ax
+			pushf
+			sub ax, DATA_WIDTH
+			popf
+			ja takeFirst
+			
+			mov dx, [es:si]
+			cmp dx, [es:di]
+			jge takeFirst
+			takeSecond:
+				mov dx, [es:di]
+				mov [ds:bx], dx
+				mov dx, [es:di + ID_INDEX_OFFSET]
+				add di, DATA_WIDTH
+				jmp endMergeIf
+			takeFirst:
+				; mov dx, [es:si]
+				mov [ds:bx], dx
+				mov dx, [es:si + ID_INDEX_OFFSET]
+				mov [ds:bx + ID_INDEX_OFFSET], dx
+				add si, DATA_WIDTH
+			endMergeIf:
+			
+			add bx, DATA_WIDTH
+		loop mergeBackLoop
+
+		pop bx ; return the merge width
+	jmp mergeSortLoop
+
+
+	ret
+endp mergeSort
+
 proc bubbleSort
 	mov cx, [data_length]
 	dec cx
 	mov ax, ValueSegment
 	mov es, ax
 	xor dl, dl ; set to 1 if no swaps happened
-	outerSortLoop:
+	outerBubbleSortLoop:
 		push cx
 		xor bx, bx
 		inc dl
-		innerSortLoop:
+		innerBubbleSortLoop:
 			mov ax, [es:bx]
 			cmp ax, [es:bx + DATA_WIDTH] ; averages
 			jge dontSwap ; descending (swap if left < right)
@@ -117,13 +186,14 @@ proc bubbleSort
 			xor dl, dl
 			dontSwap:
 			add bx, DATA_WIDTH
-		loop innerSortLoop
+		loop innerBubbleSortLoop
 		pop cx
 		test dl, dl
 		jnz retBubbleSort
-	loop outerSortLoop
+	loop outerBubbleSortLoop
 	retBubbleSort: ret
 endp bubbleSort
+
 
 proc computeAverages
 	mov cx, [data_length]
