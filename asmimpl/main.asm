@@ -11,8 +11,6 @@ DATA_WIDTH equ 6
 ID_INDEX_OFFSET equ 2
 
 ; didn't figure out how to index by name, so this is just documentation
-; TODO: string indexes are known before sorting, so only store sum and count at the start
-; then, save the string indexes when dividing
 struc DataPoint 
 	low_sum_OR_average dw ?
 	high_sum_OR_id_index dw ?
@@ -30,11 +28,11 @@ UDataSeg
 
 Stack 256
 
-; it says "location counter overlow", but this is exactly 64KB, and it looks fine on the map
 segment ValueSegment
 	values DataPoint MAX_DATA_AMOUNT dup(<>)
 ends ValueSegment
 
+; it says "location counter overlow", but this is exactly 64KB, and it looks fine on the map
 ; I can't use the number 65536
 segment IDSegment
 	ids db 65535 dup(?)
@@ -77,7 +75,7 @@ proc main
 			xchg [es:bx + DATA_WIDTH + ID_INDEX_OFFSET], ax
 			mov [es:bx + ID_INDEX_OFFSET], ax
 			dontSwap:
-			add bx, DATA_WIDTH ; TODO: overflow check or decrease structure size to 6 bytes
+			add bx, DATA_WIDTH
 		loop innerSortLoop
 		pop cx
 	loop outerSortLoop
@@ -115,7 +113,7 @@ proc main
 endp main
 
 
-proc computeAverages ; TODO: do the 8192 check only once at beginning, then repeat if necessary
+proc computeAverages
 	mov cx, [data_length]
 	xor bx, bx
 	mov ax, ValueSegment
@@ -182,7 +180,7 @@ proc readValues
 		; this mube done if the ID hasn't been found, but only after di is calculated
 		test dl, dl
 		jnz skipZeroingValues
-		mov [word ptr es:di], 0 ; low sum ; TODO: don't zero, it's zeroed
+		mov [word ptr es:di], 0 ; low sum
 		mov [word ptr es:di + 2], 0 ; high sum
 		mov [word ptr es:di + 4], 0 ; count
 		inc [data_length]
